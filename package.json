@@ -12,10 +12,14 @@
   "license": "ISC",
   "dependencies": {
     "@flatfile/api": "1.5.19",
-    "@flatfile/listener": "0.3.11",
-    "@flatfile/plugin-record-hook": "0.1.11",
+    "@flatfile/listener": "^0.3.11",
+    "@flatfile/plugin-automap": "^0.0.2",
+    "@flatfile/plugin-record-hook": "^0.1.11",
+    "@prisma/client": "^5.0.0",
     "axios": "^1.4.0",
-    "flatfile": "^3.5.8"
+    "flatfile": "^3.5.8",
+    "https": "^1.0.0",
+    "next": "^13.4.12"
   },
   "devDependencies": {
     "@types/node": "^18.16.0"
