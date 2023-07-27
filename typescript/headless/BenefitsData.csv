@@ -1,4 +1,4 @@
-ID,PlanType,Enrolled,StartDate,Contribution,CoverageType
+ID,BenefitPlan,CurrentlyEnrolled,CoverageStartDate,EmployerContribution,BenefitCoverageType
 6.46328E+13,mellon,FALSE,8/22/82,668,Insurance
 5.90325E+14,wum,FALSE,6/9/63,705,Medical
 4.97292E+14,zus,FALSE,2/3/87,660,Dental

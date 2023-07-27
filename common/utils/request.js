@@ -5,7 +5,7 @@ export const post = async ({ body }) => {
   try {
     return new Promise((resolve, reject) => {
       // Creating an HTTPS request with the provided options
-      const whPath = process.env.WEBHOOK_SITE_Path;
+      const whPath = process.env.WEBHOOK_SITE_PATH;
       const req = https.request(
         {
           method: "POST",
@@ -45,6 +45,8 @@ export const post = async ({ body }) => {
           });
         }
       );
+
+      console.log(req);
 
       // Converting the request body to JSON and sending it
       const bodyJson = JSON.stringify(body);

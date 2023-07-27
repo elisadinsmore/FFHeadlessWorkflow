@@ -5,6 +5,7 @@ import { blueprintSheets } from "../../blueprints/benefitsBlueprint";
 import { automap } from "@flatfile/plugin-automap";
 import { recordHook } from "@flatfile/plugin-record-hook";
 import { PipelineJobConfig } from "@flatfile/api/api";
+import { getFile } from "../../common/utils/grabFile";
 
 const pushToWebhookSite = async (event: FlatfileEvent) => {
   // Logging the event for debugging purposes
@@ -12,7 +13,7 @@ const pushToWebhookSite = async (event: FlatfileEvent) => {
 
   // Extracting the spaceId from the event context
   const { spaceId } = event.context;
-  const whPath = process.env.WEBHOOK_SITE_Path;
+  const whPath = process.env.WEBHOOK_SITE_PATH;
   // Making a POST request to 'hcm.show' API to sync the space
   return await post({
     hostname: "webhook.site",
@@ -193,14 +194,23 @@ export default function (listener) {
 </div>`,
       });
 
-      console.log("Created Document: " + createDoc);
+      console.log("Created Document");
+
+      // try {
+      //   const fileAttempt = await getFile();
+
+      //   const importFile = await api.files.upload(fileAttempt, spaceId);
+      //   console.log(`${importFile}`);
+      // } catch (error) {
+      //   console.log("Error importing file to space: ", error);
+      // }
 
       // Update the job status to 'complete' using the Flatfile API
       const updateJob = await api.jobs.update(jobId, {
         status: "complete",
       });
 
-      // Log the result of the updateJob function to the console as a string
+      //   // Log the result of the updateJob function to the console as a string
       console.log(
         "Updated Job With ID to Status Complete: " + updateJob.data.id
       );
@@ -287,11 +297,17 @@ export default function (listener) {
       filter: "valid",
     });
 
-    // Push them to Webhook.site
-    console.log("Pushing to Webhook.site");
-    post({
-      body: { spaceId, workbookId, importedData },
-    });
+    try {
+      // Push them to Webhook.site
+      console.log("Pushing to Webhook.site");
+      post({
+        body: { spaceId, workbookId, importedData },
+      });
+
+      //console.log(JSON.stringify(success));
+    } catch (error) {
+      console.log("couldn't complete " + error);
+    }
 
     // TODO: Get a list of successfully synced records IDs back
     // so we don't delete records that didn't sync.
@@ -301,7 +317,7 @@ export default function (listener) {
     const recordIds = importedData.data.records.map((r) => r.id);
     console.log("Deleting " + recordIds.length + " valid records.");
 
-    // Split the recordIds array into chunks of 100
+    //Split the recordIds array into chunks of 100
     for (let i = 0; i < recordIds.length; i += 100) {
       const batch = recordIds.slice(i, i + 100);
 
