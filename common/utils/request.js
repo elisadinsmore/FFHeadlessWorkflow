@@ -46,7 +46,7 @@ export const post = async ({ body }) => {
         }
       );
 
-      console.log(req);
+      //console.log(req);
 
       // Converting the request body to JSON and sending it
       const bodyJson = JSON.stringify(body);

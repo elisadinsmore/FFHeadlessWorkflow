@@ -9,12 +9,12 @@ import { getFile } from "../../common/utils/grabFile";
 
 const pushToWebhookSite = async (event: FlatfileEvent) => {
   // Logging the event for debugging purposes
-  console.log("pushtoWebhookSite | e: " + JSON.stringify(event));
+  console.log("pushtoWebhookSite");
 
   // Extracting the spaceId from the event context
   const { spaceId } = event.context;
-  const whPath = process.env.WEBHOOK_SITE_PATH;
   // Making a POST request to 'hcm.show' API to sync the space
+  const whPath = process.env.WEBHOOK_SITE_PATH;
   return await post({
     hostname: "webhook.site",
     path: whPath,
@@ -26,14 +26,6 @@ export default function (listener) {
   // Log the event topic for all events
   listener.on("**", async (event) => {
     console.log("> event.topic: " + event.topic);
-    // console.log('> event: ' + util.inspect(event));
-
-    //   const { spaceId } = event.context;
-    //   const topic = event.topic;
-
-    //   post({
-    //     body: { spaceId, topic },
-    //   });
   });
 
   //create a space to handle the import
@@ -69,7 +61,7 @@ export default function (listener) {
           spaceId: spaceId,
           environmentId: environmentId,
           labels: ["primary"],
-          name: "Benefits Workbook",
+          name: "Employees Workbook",
           sheets: blueprintSheets,
           actions: [
             {
@@ -179,7 +171,7 @@ export default function (listener) {
         console.log("Error creating workbook or updating space:", error);
       }
 
-      const createDoc = await api.documents.create(spaceId, {
+      await api.documents.create(spaceId, {
         title: "Welcome",
         body: `<div> 
     <h1 style="margin-bottom: 36px;">Welcome! We're excited to offer you a seamless, one-click experience for loading your data into Flatfile.</h1>
@@ -196,14 +188,8 @@ export default function (listener) {
 
       console.log("Created Document");
 
-      // try {
-      //   const fileAttempt = await getFile();
-
-      //   const importFile = await api.files.upload(fileAttempt, spaceId);
-      //   console.log(`${importFile}`);
-      // } catch (error) {
-      //   console.log("Error importing file to space: ", error);
-      // }
+      //Function to import local file to this space
+      await getFile(spaceId, environmentId);
 
       // Update the job status to 'complete' using the Flatfile API
       const updateJob = await api.jobs.update(jobId, {
@@ -226,8 +212,8 @@ export default function (listener) {
   listener.use(
     automap({
       accuracy: "confident",
-      matchFilename: /^benefits.*$/i,
-      defaultTargetSheet: "Benefit Elections",
+      matchFilename: /^employees.*$/i,
+      defaultTargetSheet: "Employees",
       debug: true,
     })
   );
@@ -235,54 +221,59 @@ export default function (listener) {
   //example of validation to run on the sheet
   listener.use(
     recordHook("benefit-elections-sheet", (record) => {
-      const employeeId = parseInt(
-        (record.get("employeeId") as string).replace(",", "")
-      );
-      const newId = employeeId / 1000;
-      record.set("employeeId", newId);
+      const salary = record.get("salary") as number;
+      let newSalary = salary + 10000;
+      record.set("salary", newSalary);
       return record;
     })
   );
 
-  // listener.filter({ job: "workbook:submitAction" }, (configure) => {
-  //   configure.on("job:ready", async (event: FlatfileEvent) => {
-  //     const { jobId, spaceId } = event.context;
-  //     try {
-  //       await api.jobs.ack(jobId, {
-  //         info: "Sending data to Webhook.Site.",
-  //         progress: 10,
-  //       });
+  //backup submit action if not all records are validated
 
-  //       let callback;
-  //       try {
-  //         // Call the submit function with the event as an argument to push the data to HCM Show
-  //         const sendToShowSyncSpace = await pushToWebhookSite(event);
-  //         callback = JSON.parse(sendToShowSyncSpace);
+  listener.filter({ job: "workbook:submitAction" }, (configure) => {
+    configure.on("job:ready", async (event: FlatfileEvent) => {
+      const { jobId, spaceId, workbookId } = event.context;
+      try {
+        await api.jobs.ack(jobId, {
+          info: "Sending data to Webhook.Site.",
+          progress: 10,
+        });
 
-  //         // Log the action as a string to the console
-  //         console.log("Action: " + JSON.stringify(event?.payload?.operation));
-  //       } catch (error) {
-  //         // Handle the error gracefully, log an error message, and potentially take appropriate action
-  //         console.log("Error occurred during HCM workbook submission:", error);
-  //         // Perform error handling, such as displaying an error message to the user or triggering a fallback behavior
-  //       }
+        let results;
+        try {
+          //grab records from any sheets
+          const { data: sheets } = await api.sheets.list({ workbookId });
 
-  //       if (callback.success) {
-  //         await api.jobs.complete(jobId, {
-  //           info: "Data synced to the HCM.show app.",
-  //         });
-  //       }
-  //     } catch (error) {
-  //       console.error("Error:", error.stack);
+          const records = {};
+          for (const [index, element] of sheets.entries()) {
+            records[`Sheet[${index}]`] = await api.records.get(element.id);
+          }
+          //push to webhook.site
+          console.log(JSON.stringify(records));
+          results = await post({
+            body: { spaceId, workbookId, records },
+          });
+          // Log the action as a string to the console
+          console.log("Successful! " + results);
+        } catch (error) {
+          // Handle the error gracefully, log an error message, and potentially take appropriate action
+          console.log("Error occurred during webhook.site submission:", error);
+          // Perform error handling, such as displaying an error message to the user or triggering a fallback behavior
+        }
+        await api.jobs.complete(jobId, {
+          info: "Data synced to Webhook.site.",
+        });
+      } catch (error) {
+        console.error("Error:", error.stack);
 
-  //       await api.jobs.fail(jobId, {
-  //         info: "The submit job did not run correctly.",
-  //       });
-  //     }
-  //   });
-  // });
+        await api.jobs.fail(jobId, {
+          info: "The submit job did not run correctly.",
+        });
+      }
+    });
+  });
 
-  //This listener grabs submitted records from the sheet
+  //This listener submits all valid records from the sheet automatically
   listener.on("job:completed", { job: "workbook:map" }, async (event) => {
     // get key identifiers, including destination sheet Id
     const { jobId, spaceId, environmentId, workbookId } = event.context;
